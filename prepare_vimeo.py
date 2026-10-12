@@ -24,7 +24,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import cv2
-import numpy as np
 
 # ── Chemins (tout sur DisqueGab) ──────────────────────────────────────────────
 DISK          = Path("/Volumes/DisqueGab")

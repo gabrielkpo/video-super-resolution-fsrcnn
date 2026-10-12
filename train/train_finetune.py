@@ -183,8 +183,8 @@ def main(epochs: int, lr: float, batch: int, patch: int,
     print(f"Meilleur Val L1  : {best_val_l1:.5f}")
     print(f"Checkpoint final : {CKPT_OUT}")
     print("\nPour utiliser le modèle fine-tuné :")
-    print(f"  from methods.level6_cnn import load_model")
-    print(f"  model = load_model('train/fsrcnn_vimeo_best.ckpt')")
+    print("  from methods.level6_cnn import load_model")
+    print("  model = load_model('train/fsrcnn_vimeo_best.ckpt')")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import SCALE_FACTOR, DEVICE
+from config import DEVICE
 
 DEFAULT_CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
 
