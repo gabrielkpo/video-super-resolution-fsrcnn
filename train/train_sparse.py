@@ -18,7 +18,7 @@ import cv2
 warnings.filterwarnings("ignore")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import DIV2K_DIR, SCALE_FACTOR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR, VIDEO_SCALE
+from config import DIV2K_DIR, SCALE_FACTOR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR
 from methods.level4_ml_classic import SparseSR
 
 MODEL_PATH = Path(__file__).parent / "sparse_sr.joblib"
