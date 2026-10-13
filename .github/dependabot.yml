@@ -4,7 +4,30 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Conventional Commits titles, so the PR title check passes; one grouped PR per week
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      python:
+        patterns: ["*"]
+    ignore:
+      # trained checkpoints and the benchmark depend on these; majors are upgraded deliberately
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "torchvision"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "numpy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "opencv-python"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "scikit-image"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
