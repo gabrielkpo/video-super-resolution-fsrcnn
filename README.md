@@ -72,8 +72,9 @@ python -m train.benchmark_vimeo --max-clips 100
 python -m workflow.compare_sad_vs_fsrcnn
 ```
 
-Vimeo-90K lives on an external disk in the original setup (`/Volumes/DisqueGab`); point
-`VSR_DATA_DISK` to your copy. The other paths are in `config.py`.
+Vimeo-90K is read from `data/` by default; set `VSR_DATA_DISK` to use another location (the
+original runs used an external disk: `VSR_DATA_DISK=/Volumes/DisqueGab`). The other paths are
+in `config.py`.
 
 ## Data and checkpoints
 

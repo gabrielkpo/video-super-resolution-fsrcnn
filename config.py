@@ -5,8 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 
-# External disk holding Vimeo-90K and its LR copies (DisqueGab in the original setup).
-DATA_DISK = Path(os.environ.get("VSR_DATA_DISK", "/Volumes/DisqueGab"))
+# Folder holding Vimeo-90K and its LR copies (see README, "Data and checkpoints").
+DATA_DISK = Path(os.environ.get("VSR_DATA_DISK", ROOT / "data"))
 
 # ── Raw data (source videos) ─────────────────────────────────────────────────
 DATA_DIR = ROOT / "data_ytb_1fps"
