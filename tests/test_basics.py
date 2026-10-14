@@ -1,10 +1,5 @@
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from methods.level1_interpolation import run_all, upscale  # noqa: E402
 from pipeline.metrics import psnr  # noqa: E402

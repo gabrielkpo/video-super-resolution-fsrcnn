@@ -1,9 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-super-resolution-fsrcnn"
+version = "0.1.0"
+description = "Video super-resolution: classical baselines, sparse coding and FSRCNN, with a temporal block filter"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Gabriel Kpodoh" }, { name = "Thomas Delacretaz-Martinon" }]
+dependencies = [
+  "numpy",
+  "opencv-python",
+  "scikit-image",
+  "scikit-learn",
+  "joblib",
+  "torch",
+  "torchvision",
+  "pillow",
+  "matplotlib",
+  "pandas",
+  "codecarbon",
+  "pywavelets",
+  "bm3d",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[tool.setuptools]
+packages = ["methods", "pipeline", "train", "workflow"]
+py-modules = ["config"]
+
 [tool.ruff]
 line-length = 100
+extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
-# Pragmatic baseline for research code: real errors and unused imports only.
-select = ["E9", "F"]
+select = ["E", "W", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

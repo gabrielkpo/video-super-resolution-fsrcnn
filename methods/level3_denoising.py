@@ -1,26 +1,31 @@
 """Niveau 3 — débruitage + upscaling : bilatéral, NLM, BM3D."""
-import numpy as np
+
 import cv2
+import numpy as np
 
 try:
     import bm3d as _bm3d_lib
+
     _BM3D_AVAILABLE = True
 except ImportError:
     _BM3D_AVAILABLE = False
 
 
-def bilateral_sr(img: np.ndarray, scale: int,
-                 d: int = 9, sigma_color: float = 75, sigma_space: float = 75) -> np.ndarray:
+def bilateral_sr(
+    img: np.ndarray, scale: int, d: int = 9, sigma_color: float = 75, sigma_space: float = 75
+) -> np.ndarray:
     denoised = cv2.bilateralFilter(img, d, sigma_color, sigma_space)
     h, w = denoised.shape[:2]
     return cv2.resize(denoised, (w * scale, h * scale), interpolation=cv2.INTER_CUBIC)
 
 
-def nlm_sr(img: np.ndarray, scale: int,
-           h_param: float = 10, template_size: int = 7, search_size: int = 21) -> np.ndarray:
+def nlm_sr(
+    img: np.ndarray, scale: int, h_param: float = 10, template_size: int = 7, search_size: int = 21
+) -> np.ndarray:
     if img.ndim == 3:
-        denoised = cv2.fastNlMeansDenoisingColored(img, None, h_param, h_param,
-                                                   template_size, search_size)
+        denoised = cv2.fastNlMeansDenoisingColored(
+            img, None, h_param, h_param, template_size, search_size
+        )
     else:
         denoised = cv2.fastNlMeansDenoising(img, None, h_param, template_size, search_size)
     h, w = denoised.shape[:2]
@@ -43,7 +48,7 @@ def bm3d_sr(img: np.ndarray, scale: int, sigma_psd: float = 25) -> np.ndarray:
 def run_all(img: np.ndarray, scale: int) -> dict[str, np.ndarray]:
     results = {
         "bilateral_sr": bilateral_sr(img, scale),
-        "nlm_sr":        nlm_sr(img, scale),
+        "nlm_sr": nlm_sr(img, scale),
     }
     if _BM3D_AVAILABLE:
         results["bm3d_sr"] = bm3d_sr(img, scale)

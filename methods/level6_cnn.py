@@ -5,8 +5,9 @@ Checkpoint de référence pré-entraîné : train/fsrcnn_div2k.ckpt
 Usage standalone :
     python methods/level6_cnn.py --ckpt train/fsrcnn_div2k.ckpt
 """
+
 from __future__ import annotations
-import sys
+
 from pathlib import Path
 
 import cv2
@@ -14,13 +15,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import DEVICE
 
 DEFAULT_CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
 
 
 # ── Architecture ─────────────────────────────────────────────────────────────
+
 
 class FSRCNN(nn.Module):
     """Fast Super-Resolution CNN — Dong et al., ECCV 2016.
@@ -30,6 +31,7 @@ class FSRCNN(nn.Module):
         s  = dimension compressée (shrinking/expanding)
         m  = nombre de couches de mapping non-linéaire
     """
+
     def __init__(self, scale: int = 4, d: int = 56, s: int = 12, m: int = 4) -> None:
         super().__init__()
         self.scale = scale
@@ -63,10 +65,10 @@ class FSRCNN(nn.Module):
 
 # ── Chargement ───────────────────────────────────────────────────────────────
 
-def load_model(ckpt_path: str | Path = DEFAULT_CKPT,
-               device: str = DEVICE) -> FSRCNN:
+
+def load_model(ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE) -> FSRCNN:
     """Charge un checkpoint en détectant automatiquement d, s, m."""
-    ckpt       = torch.load(str(ckpt_path), map_location=device)
+    ckpt = torch.load(str(ckpt_path), map_location=device)
     state_dict = ckpt["model"] if "model" in ckpt else ckpt
     d = state_dict["feature.0.weight"].shape[0]
     s = state_dict["shrink.0.weight"].shape[0]
@@ -79,9 +81,10 @@ def load_model(ckpt_path: str | Path = DEFAULT_CKPT,
 
 # ── Inférence ────────────────────────────────────────────────────────────────
 
-def upscale(img: np.ndarray, scale: int,
-            ckpt_path: str | Path = DEFAULT_CKPT,
-            device: str = DEVICE) -> np.ndarray:
+
+def upscale(
+    img: np.ndarray, scale: int, ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE
+) -> np.ndarray:
     """Interface standard niveau 6 : SR couleur pleine image.
 
     Traite le canal Y avec FSRCNN, Cr/Cb en bicubique.
@@ -91,17 +94,18 @@ def upscale(img: np.ndarray, scale: int,
     return _infer(img, model, scale, device)
 
 
-def _infer(img: np.ndarray, model: FSRCNN,
-           scale: int | None = None, device: str = DEVICE) -> np.ndarray:
+def _infer(
+    img: np.ndarray, model: FSRCNN, scale: int | None = None, device: str = DEVICE
+) -> np.ndarray:
     """Inférence interne : FSRCNN sur Y, bicubique sur Cr/Cb."""
     model.eval().to(device)
-    sc   = scale or model.scale
+    sc = scale or model.scale
     h, w = img.shape[:2]
 
-    ycrcb     = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+    ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
     y, cr, cb = cv2.split(ycrcb)
 
-    t    = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(device)
+    t = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(device)
     with torch.no_grad():
         y_sr = np.clip(model(t).squeeze().cpu().numpy() * 255, 0, 255).astype(np.uint8)
 

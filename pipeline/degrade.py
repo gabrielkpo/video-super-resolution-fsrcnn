@@ -10,16 +10,20 @@ Génère deux jeux de frames LR à partir des frames HR :
 Usage :
     python pipeline/degrade.py
 """
-import sys
+
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import (
-    FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR, FRAMES_LR_PHASE2_DIR,
-    SCALE_FACTOR, VIDEO_SCALE, BLUR_KERNEL_SIZE, NOISE_STD_PHASE2,
+    BLUR_KERNEL_SIZE,
+    FRAMES_HR_DIR,
+    FRAMES_LR_PHASE1_DIR,
+    FRAMES_LR_PHASE2_DIR,
+    NOISE_STD_PHASE2,
+    SCALE_FACTOR,
+    VIDEO_SCALE,
 )
 
 
@@ -29,9 +33,12 @@ def degrade_phase1(img: np.ndarray, scale: int = SCALE_FACTOR) -> np.ndarray:
     return cv2.resize(img, (w // scale, h // scale), interpolation=cv2.INTER_CUBIC)
 
 
-def degrade_phase2(img: np.ndarray, scale: int = SCALE_FACTOR,
-                   blur_k: int = BLUR_KERNEL_SIZE,
-                   noise_std: float = NOISE_STD_PHASE2) -> np.ndarray:
+def degrade_phase2(
+    img: np.ndarray,
+    scale: int = SCALE_FACTOR,
+    blur_k: int = BLUR_KERNEL_SIZE,
+    noise_std: float = NOISE_STD_PHASE2,
+) -> np.ndarray:
     """Dégradation réaliste : flou gaussien → bicubique → AWGN σ=25."""
     h, w = img.shape[:2]
     if blur_k > 1:

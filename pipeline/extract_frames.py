@@ -5,15 +5,12 @@ Usage :
     python pipeline/extract_frames.py --url <URL_YouTube> --fps 1
 """
 
-
 import argparse
-import subprocess
-import sys
 import re
+import subprocess
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import RAW_DIR, FRAMES_HR_DIR, EXTRACT_FPS, VIDEO_URL2
+from config import EXTRACT_FPS, FRAMES_HR_DIR, RAW_DIR, VIDEO_URL2
 
 
 def download_video(url: str) -> Path:
@@ -28,9 +25,12 @@ def download_video(url: str) -> Path:
     print(f"[download] Téléchargement de {url} ...")
     cmd = [
         "yt-dlp",
-        "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
-        "--merge-output-format", "mp4",
-        "--output", str(RAW_DIR / f"{video_id}.%(ext)s"),
+        "--format",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "--merge-output-format",
+        "mp4",
+        "--output",
+        str(RAW_DIR / f"{video_id}.%(ext)s"),
         "--no-playlist",
         url,
     ]
@@ -56,8 +56,9 @@ def _parse_video_id(url: str) -> str:
     return re.sub(r"[^\w]", "_", url)[-20:]
 
 
-def extract_frames(video_path: Path, output_dir: Path,
-                   fps: int = EXTRACT_FPS, max_frames: int | None = None) -> int:
+def extract_frames(
+    video_path: Path, output_dir: Path, fps: int = EXTRACT_FPS, max_frames: int | None = None
+) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     existing = list(output_dir.glob("frame_*.png"))
@@ -85,8 +86,9 @@ def extract_frames(video_path: Path, output_dir: Path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default=VIDEO_URL2,
-                        help="URL YouTube (défaut : VIDEO_URL dans config.py)")
+    parser.add_argument(
+        "--url", default=VIDEO_URL2, help="URL YouTube (défaut : VIDEO_URL dans config.py)"
+    )
     parser.add_argument("--fps", type=int, default=EXTRACT_FPS)
     parser.add_argument("--max_frames", type=int, default=None)
     args = parser.parse_args()

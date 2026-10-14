@@ -1,18 +1,20 @@
 """Niveau 2 — méthodes fréquentielles : DWT et FFT zero-padding."""
-import numpy as np
+
 import cv2
+import numpy as np
 import pywt
 
 
 def fft_zeropad(img: np.ndarray, scale: int) -> np.ndarray:
     """Zero-padding dans le domaine fréquentiel (FFT shift)."""
+
     def _upscale_channel(channel: np.ndarray) -> np.ndarray:
         h, w = channel.shape
         F = np.fft.fftshift(np.fft.fft2(channel))
         ph, pw = h * scale, w * scale
         pad_h, pad_w = (ph - h) // 2, (pw - w) // 2
         F_pad = np.zeros((ph, pw), dtype=complex)
-        F_pad[pad_h:pad_h + h, pad_w:pad_w + w] = F * (scale ** 2)
+        F_pad[pad_h : pad_h + h, pad_w : pad_w + w] = F * (scale**2)
         return np.abs(np.fft.ifft2(np.fft.ifftshift(F_pad)))
 
     if img.ndim == 2:
@@ -31,6 +33,7 @@ def dwt_upscale(img: np.ndarray, scale: int, wavelet: str = "haar") -> np.ndarra
     LL est upscalé en bicubique (contenu basse fréquence) ;
     les sous-bandes de détail sont upscalées en bilinéaire.
     """
+
     def _upscale_channel(channel: np.ndarray) -> np.ndarray:
         h, w = channel.shape
         LL, (LH, HL, HH) = pywt.dwt2(channel.astype(float), wavelet)
@@ -57,7 +60,7 @@ def dwt_upscale(img: np.ndarray, scale: int, wavelet: str = "haar") -> np.ndarra
 
 def run_all(img: np.ndarray, scale: int) -> dict[str, np.ndarray]:
     return {
-        "fft_zeropad":    fft_zeropad(img, scale),
-        "dwt_haar":       dwt_upscale(img, scale, wavelet="haar"),
-        "dwt_db2":        dwt_upscale(img, scale, wavelet="db2"),
+        "fft_zeropad": fft_zeropad(img, scale),
+        "dwt_haar": dwt_upscale(img, scale, wavelet="haar"),
+        "dwt_db2": dwt_upscale(img, scale, wavelet="db2"),
     }

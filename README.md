@@ -60,13 +60,13 @@ than quoted from memory.
 ## Reproduce
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # pinned versions, installs the project in editable mode
 
 # Level 1 baselines on an image
-python methods/level1_interpolation.py
+python -m methods.level1_interpolation
 
 # FSRCNN vs bicubic on the Vimeo-90K test split (needs the dataset, see below)
-python train/benchmark_vimeo.py --max-clips 100
+python -m train.benchmark_vimeo --max-clips 100
 
 # SAD + FSRCNN vs FSRCNN alone
 python -m workflow.compare_sad_vs_fsrcnn
@@ -85,8 +85,8 @@ Paths to the datasets are set at the top of `train/benchmark_vimeo.py` and `conf
 ## Development
 
 ```bash
-pip install pytest ruff
-ruff check .
+pip install -r requirements.txt pytest ruff
+ruff check . && ruff format --check .
 pytest
 ```
 

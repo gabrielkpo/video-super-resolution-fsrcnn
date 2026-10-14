@@ -5,6 +5,7 @@ Structure attendue sur DisqueGab (produite par prepare_vimeo.py) :
     /Volumes/DisqueGab/vimeo_septuplet/sequences/XXXXX/YYYY/im{1..7}.png  (HR 256×448)
     /Volumes/DisqueGab/vimeo_sr/splits/{train,val,test}.txt
 """
+
 from __future__ import annotations
 
 import random
@@ -15,10 +16,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-DISK    = Path("/Volumes/DisqueGab")
+DISK = Path("/Volumes/DisqueGab")
 LR_ROOT = DISK / "vimeo_sr" / "sequences_lr"
 HR_ROOT = DISK / "vimeo_septuplet" / "sequences"
-SPLITS  = DISK / "vimeo_sr" / "splits"
+SPLITS = DISK / "vimeo_sr" / "splits"
 
 
 class VimeoSRDataset(Dataset):
@@ -28,8 +29,9 @@ class VimeoSRDataset(Dataset):
     Patches aléatoires + augmentation à chaque accès pour maximiser la diversité.
     """
 
-    def __init__(self, split: str = "train", patch_size: int = 32,
-                 scale: int = 4, augment: bool = True) -> None:
+    def __init__(
+        self, split: str = "train", patch_size: int = 32, scale: int = 4, augment: bool = True
+    ) -> None:
         split_file = SPLITS / f"{split}.txt"
         if not split_file.exists():
             raise FileNotFoundError(
@@ -51,9 +53,9 @@ class VimeoSRDataset(Dataset):
             print(f"  [dataset] {n_bad} clip(s) exclus (im4 manquant) sur {len(clips)}")
 
         # Un item = (clip_rel, indice de frame 1–7)
-        self.items   = [(c, i) for c in valid_clips for i in range(1, 8)]
-        self.ps      = patch_size
-        self.scale   = scale
+        self.items = [(c, i) for c in valid_clips for i in range(1, 8)]
+        self.ps = patch_size
+        self.scale = scale
         self.augment = augment
 
     def __len__(self) -> int:
@@ -73,8 +75,8 @@ class VimeoSRDataset(Dataset):
         if lr_bgr is None or hr_bgr is None:
             # Disque inaccessible ou clip entièrement corrompu — fail fast
             if not DISK.exists():
-                raise IOError(f"DisqueGab non monté : {DISK}")
-            raise IOError(f"Clip illisible (LR et im4 absents) : {clip_rel}")
+                raise OSError(f"DisqueGab non monté : {DISK}")
+            raise OSError(f"Clip illisible (LR et im4 absents) : {clip_rel}")
 
         # Canal Y uniquement — float32 normalisé [0, 1]
         lr_y = cv2.cvtColor(lr_bgr, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(np.float32) / 255.0
@@ -85,8 +87,8 @@ class VimeoSRDataset(Dataset):
         ps, sc = self.ps, self.scale
         y0 = random.randint(0, lh - ps)
         x0 = random.randint(0, lw - ps)
-        lr_patch = lr_y[y0:y0+ps,      x0:x0+ps]
-        hr_patch = hr_y[y0*sc:(y0+ps)*sc, x0*sc:(x0+ps)*sc]
+        lr_patch = lr_y[y0 : y0 + ps, x0 : x0 + ps]
+        hr_patch = hr_y[y0 * sc : (y0 + ps) * sc, x0 * sc : (x0 + ps) * sc]
 
         # Augmentation (flip H/V + rotation 90°)
         if self.augment:
@@ -101,5 +103,7 @@ class VimeoSRDataset(Dataset):
                 lr_patch = np.rot90(lr_patch, k).copy()
                 hr_patch = np.rot90(hr_patch, k).copy()
 
-        return (torch.from_numpy(lr_patch).unsqueeze(0),   # (1, ps, ps)
-                torch.from_numpy(hr_patch).unsqueeze(0))   # (1, ps*sc, ps*sc)
+        return (
+            torch.from_numpy(lr_patch).unsqueeze(0),  # (1, ps, ps)
+            torch.from_numpy(hr_patch).unsqueeze(0),
+        )  # (1, ps*sc, ps*sc)

@@ -1,16 +1,15 @@
 """PSNR, SSIM, et métriques énergétiques via CodeCarbon."""
-import sys
-from pathlib import Path
+
 from contextlib import contextmanager
 
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import COUNTRY_ISO
 
 try:
     from codecarbon import EmissionsTracker
+
     _CODECARBON = True
 except ImportError:
     _CODECARBON = False

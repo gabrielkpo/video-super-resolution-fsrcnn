@@ -8,17 +8,17 @@ Usage :
     python train/train_sparse.py --source frames
     python train/train_sparse.py --source div2k --n_imgs 100
 """
+
+import argparse
 import sys
 import warnings
-import argparse
 from pathlib import Path
 
 import cv2
 
 warnings.filterwarnings("ignore")
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import DIV2K_DIR, SCALE_FACTOR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR
+from config import DIV2K_DIR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR, SCALE_FACTOR
 from methods.level4_ml_classic import SparseSR
 
 MODEL_PATH = Path(__file__).parent / "sparse_sr.joblib"
@@ -39,7 +39,7 @@ def load_div2k_pairs(n_imgs: int, scale: int) -> list:
         if hr_img is None:
             continue
         lr_path = lr_dir / f"{hr_path.stem}x{scale}.png"
-        lr_img  = cv2.imread(str(lr_path)) if lr_path.exists() else _degrade(hr_img, scale)
+        lr_img = cv2.imread(str(lr_path)) if lr_path.exists() else _degrade(hr_img, scale)
         if lr_img is not None:
             pairs.append((lr_img, hr_img))
     return pairs
@@ -70,10 +70,12 @@ def _degrade(hr_img, scale: int):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source",     choices=["div2k", "frames", "combined"], default="div2k")
-    parser.add_argument("--n_imgs",     type=int, default=100, help="Nb images DIV2K (ignoré si --source frames)")
-    parser.add_argument("--n_atoms",    type=int, default=256)
-    parser.add_argument("--n_nonzero",  type=int, default=3)
+    parser.add_argument("--source", choices=["div2k", "frames", "combined"], default="div2k")
+    parser.add_argument(
+        "--n_imgs", type=int, default=100, help="Nb images DIV2K (ignoré si --source frames)"
+    )
+    parser.add_argument("--n_atoms", type=int, default=256)
+    parser.add_argument("--n_nonzero", type=int, default=3)
     parser.add_argument("--patch_size", type=int, default=8)
     args = parser.parse_args()
 
