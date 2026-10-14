@@ -1,8 +1,6 @@
-"""Niveau 3 — Machine Learning classique : sparse coding sur patches LR/HR."""
+"""Level 4 — classical machine learning: sparse coding on LR/HR patches."""
 
 import warnings
-
-warnings.filterwarnings("ignore")
 from pathlib import Path
 
 import cv2
@@ -12,19 +10,19 @@ from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.linear_model import Ridge, orthogonal_mp
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Utilitaires
+# Utilities
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 def _to_y(img: np.ndarray) -> np.ndarray:
-    """Canal Y (luma YCrCb, BT.601) — même formule que BGR2GRAY."""
+    """Y channel (YCrCb luma, BT.601), same formula as BGR2GRAY."""
     return cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)[:, :, 0] if img.ndim == 3 else img
 
 
 def _lr_features(patch: np.ndarray) -> np.ndarray:
     """
-    Descripteur Yang et al. (2010) : gradients ordre 1 et 2 (Sobel).
-    Invariant à la composante DC — cohérent avec le résidu HF à prédire.
+    Yang et al. (2010) descriptor: first and second order gradients (Sobel).
+    Invariant to the DC component, consistent with the high-frequency residual to predict.
     """
     p = patch.astype(np.float32) / 255.0
     gx = cv2.Sobel(p, cv2.CV_32F, 1, 0, ksize=3)
@@ -38,18 +36,18 @@ def _extract_pairs(
     lr_gray: np.ndarray, hr_gray: np.ndarray, patch_size: int, stride: int, scale: int
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Extrait les paires (features LR, résidu HR).
+    Extract (LR features, HR residual) pairs.
 
-    Un patch LR de taille p×p couvre une région HR de taille (p·scale)×(p·scale).
-    Résidu = HR_patch - bic_global_patch — bicubique calculée sur l'image COMPLÈTE,
-    identique à celle utilisée à l'inférence (même convention de centrage OpenCV).
-    Garantie : patch lisse → features ≈ 0 → α ≈ 0 → résidu ≈ 0 → sortie = bicubique.
+    A p×p LR patch covers a (p·scale)×(p·scale) HR region.
+    Residual = HR_patch - bic_global_patch, with the bicubic computed on the WHOLE image,
+    exactly as at inference (same OpenCV centring convention).
+    Guarantee: smooth patch → features ≈ 0 → α ≈ 0 → residual ≈ 0 → output = bicubic.
     """
     h, w = lr_gray.shape
     H, W = h * scale, w * scale
     ph_hr = patch_size * scale
 
-    # Bicubique globale — même calcul qu'à l'inférence pour éviter le décalage sub-pixel
+    # Global bicubic, computed as at inference to avoid a sub-pixel shift
     bic_global = cv2.resize(lr_gray.astype(np.float32), (W, H), interpolation=cv2.INTER_CUBIC)
 
     lr_feats, hr_residuals = [], []
@@ -62,7 +60,7 @@ def _extract_pairs(
             bic_patch = bic_global[y_hr : y_hr + ph_hr, x_hr : x_hr + ph_hr]
 
             if hr_patch.shape != (ph_hr, ph_hr):
-                continue  # patch de bord incomplet
+                continue  # incomplete border patch
 
             residual = (hr_patch.astype(np.float32) - bic_patch) / 128.0
 
@@ -73,30 +71,30 @@ def _extract_pairs(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Sparse Coding SR — dictionnaires couplés DLR / DHR
+# Sparse coding SR — coupled DLR / DHR dictionaries
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 class SparseSR:
     """
-    Super-résolution par sparse coding avec dictionnaires couplés DLR et DHR.
+    Sparse-coding super-resolution with coupled DLR and DHR dictionaries.
 
-    Formulation résidu (Yang et al., 2010) :
-        DLR apprend les descripteurs gradient (Sobel) des patches LR
-        DHR apprend les résidus haute-fréquence HR - bicubique(LR)
+    Residual formulation (Yang et al., 2010):
+        DLR learns the gradient (Sobel) descriptors of the LR patches
+        DHR learns the high-frequency residuals HR - bicubic(LR)
 
-    Un patch LR p×p correspond à une région HR (p·scale)×(p·scale).
-    Garantie de dégradation gracieuse : zones lisses → résidu ≈ 0 → sortie = bicubique.
+    A p×p LR patch maps to a (p·scale)×(p·scale) HR region.
+    Graceful degradation: smooth areas → residual ≈ 0 → output = bicubic.
 
-    Apprentissage :
-        1. Extraction des descripteurs gradient LR et des résidus HR complets
-        2. DLR appris par MiniBatchDictionaryLearning (ODL)
-        3. Codes α calculés par OMP sur DLR
-        4. DHR appris par Ridge regression : DHR = ridge.fit(A, X_res)
+    Training:
+        1. Extract LR gradient descriptors and full HR residuals
+        2. Learn DLR with MiniBatchDictionaryLearning (ODL)
+        3. Compute the α codes with OMP on DLR
+        4. Learn DHR by ridge regression: DHR = ridge.fit(A, X_res)
 
-    Inférence :
+    Inference:
         α* = OMP(DLR, grad(LR_patch))
-        SR = bicubique(LR) + DHR · α*
+        SR = bicubic(LR) + DHR · α*
     """
 
     def __init__(
@@ -119,13 +117,13 @@ class SparseSR:
         self.D_lr = None  # (n_atoms, d_lr)
         self.D_hr = None  # (d_hr,   n_atoms)   d_hr = (patch_size * scale)²
 
-    # ── Entraînement ─────────────────────────────────────────────────────────
+    # ── Training ─────────────────────────────────────────────────────────────
 
     def fit(self, lr_imgs: list, hr_imgs: list) -> "SparseSR":
-        """Apprend DLR et DHR à partir de paires d'images (LR, HR)."""
+        """Learn DLR and DHR from (LR, HR) image pairs."""
 
-        # Étape 1 — Extraction : arrêt anticipé pour éviter l'OOM
-        print(f"[SparseSR] Extraction des patches ({len(lr_imgs)} images)…")
+        # Step 1: extraction, stopped early to avoid running out of memory
+        print(f"[SparseSR] Extracting patches ({len(lr_imgs)} images)…")
         all_lr, all_hr = [], []
         total = 0
         for lr, hr in zip(lr_imgs, hr_imgs, strict=False):
@@ -144,10 +142,10 @@ class SparseSR:
 
         X_lr = np.vstack(all_lr)[: self.max_patches]
         X_res = np.vstack(all_hr)[: self.max_patches]
-        print(f"[SparseSR] {len(X_lr):,} patches extraits.")
+        print(f"[SparseSR] {len(X_lr):,} patches extracted.")
 
-        # Étape 2 — ODL : apprentissage du dictionnaire DLR
-        print("[SparseSR] Apprentissage DLR (ODL)…")
+        # Step 2: ODL, learn the DLR dictionary
+        print("[SparseSR] Learning DLR (ODL)…")
         odl = MiniBatchDictionaryLearning(
             n_components=self.n_atoms,
             alpha=1.0,
@@ -163,31 +161,31 @@ class SparseSR:
             odl.fit(X_lr)
         self.D_lr = odl.components_  # (n_atoms, d_lr)
 
-        # Étape 3 — Codes α parcimonieux via OMP
-        print("[SparseSR] Calcul des codes α (OMP)…")
+        # Step 3: sparse α codes with OMP
+        print("[SparseSR] Computing the α codes (OMP)…")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             A = odl.transform(X_lr)  # (N, n_atoms)
 
-        # Étape 4 — DHR par Ridge regression (robuste au conditionnement sparse)
-        print("[SparseSR] Apprentissage DHR (Ridge)…")
+        # Step 4: DHR by ridge regression (robust to the sparse conditioning)
+        print("[SparseSR] Learning DHR (ridge)…")
         ridge = Ridge(alpha=1.0, fit_intercept=False)
         ridge.fit(A, X_res)
-        self.D_hr = ridge.coef_  # (d_hr, n_atoms) — convention sklearn multi-output
+        self.D_hr = ridge.coef_  # (d_hr, n_atoms), sklearn multi-output convention
 
         expected_d_hr = (self.patch_size * self.scale) ** 2
         assert self.D_hr.shape == (expected_d_hr, self.n_atoms), (
             f"D_hr shape {self.D_hr.shape} ≠ ({expected_d_hr}, {self.n_atoms})"
         )
 
-        print("[SparseSR] Entraînement terminé.")
+        print("[SparseSR] Training done.")
         return self
 
-    # ── Inférence ─────────────────────────────────────────────────────────────
+    # ── Inference ─────────────────────────────────────────────────────────────
 
     def predict(self, lr_img: np.ndarray) -> np.ndarray:
-        """SR sur le canal Y (luma) + upscale bicubique des canaux chroma."""
-        assert self.D_lr is not None, "Appeler fit() ou load() avant predict()."
+        """SR on the Y (luma) channel, bicubic upscale of the chroma channels."""
+        assert self.D_lr is not None, "Call fit() or load() before predict()."
 
         is_color = lr_img.ndim == 3
         if is_color:
@@ -220,8 +218,8 @@ class SparseSR:
 
         RES_patches = self.D_hr @ A
 
-        # Gating : annule le résidu sur les patches sans structure.
-        # OMP force n_nonzero atomes même sur patch plat → faux détail sinon.
+        # Gating: zero the residual on patches without structure.
+        # OMP always uses n_nonzero atoms, even on a flat patch, which would add fake detail.
         patch_energy = np.linalg.norm(X, axis=1)
         RES_patches[:, patch_energy < np.median(patch_energy) / 4] = 0.0
 
@@ -242,7 +240,7 @@ class SparseSR:
         hr_cb = cv2.resize(lr_cb, (W, H), interpolation=cv2.INTER_CUBIC)
         return cv2.cvtColor(cv2.merge([hr_y, hr_cr, hr_cb]), cv2.COLOR_YCrCb2BGR)
 
-    # ── Sauvegarde / Chargement ───────────────────────────────────────────────
+    # ── Save / load ───────────────────────────────────────────────────────────
 
     def save(self, path: Path | str):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -262,7 +260,7 @@ class SparseSR:
             },
             path,
         )
-        print(f"[SparseSR] Modèle sauvegardé → {path}")
+        print(f"[SparseSR] Model saved → {path}")
 
     def load(self, path: Path | str) -> "SparseSR":
         for k, v in joblib.load(path).items():
@@ -271,10 +269,9 @@ class SparseSR:
 
 
 def sparse_sr(lr_img: np.ndarray, scale: int, model_path: Path | str | None = None) -> np.ndarray:
-    """Interface fonctionnelle : charge le modèle pré-entraîné et applique la SR."""
+    """Functional interface: load the pre-trained model and apply SR."""
     if model_path is None or not Path(model_path).exists():
         raise FileNotFoundError(
-            f"Modèle sparse introuvable : {model_path}\n"
-            "Lancer d'abord : python train/train_sparse.py"
+            f"Sparse model not found: {model_path}\nRun first: python -m train.train_sparse"
         )
     return SparseSR(scale=scale).load(model_path).predict(lr_img)

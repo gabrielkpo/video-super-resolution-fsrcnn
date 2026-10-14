@@ -72,8 +72,8 @@ python -m train.benchmark_vimeo --max-clips 100
 python -m workflow.compare_sad_vs_fsrcnn
 ```
 
-Paths to the datasets are set at the top of `train/benchmark_vimeo.py` and `config.py`
-(an external disk in the original setup); adapt them to your machine.
+Vimeo-90K lives on an external disk in the original setup (`/Volumes/DisqueGab`); point
+`VSR_DATA_DISK` to your copy. The other paths are in `config.py`.
 
 ## Data and checkpoints
 

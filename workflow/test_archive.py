@@ -1,8 +1,8 @@
-"""Test du workflow SAD+FSRCNN sur les vidéos UCF-101 (dataset_UFC101/test).
+"""SAD + FSRCNN workflow on UCF-101 videos (dataset_UFC101/test).
 
-Usage :
-    python -m workflow.test_archive                          # vidéo aléatoire
-    python -m workflow.test_archive --category Basketball    # catégorie choisie
+Usage:
+    python -m workflow.test_archive                          # random video
+    python -m workflow.test_archive --category Basketball    # chosen category
     python -m workflow.test_archive --video dataset_UFC101/test/Basketball/v_Basketball_g01_c01.avi
 """
 
@@ -13,13 +13,14 @@ import time
 from pathlib import Path
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 
 from config import RESULTS_VISUALS_DIR
 from pipeline.metrics import psnr, ssim
 from workflow.model import load_model
 from workflow.pipeline import SadFsrcnnPipeline
+from workflow.run import HEADER
+from workflow.visual import save_comparison
 
 CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
 ARCHIVE = Path(__file__).parent.parent / "dataset_UFC101" / "test"
@@ -33,7 +34,7 @@ def pick_video(category: str | None, video_path: str | None, seed: int | None = 
     if video_path:
         p = Path(video_path)
         if not p.exists():
-            print(f"[test_archive] Fichier introuvable : {p}")
+            print(f"[test_archive] File not found: {p}")
             sys.exit(1)
         return p
     if seed is not None:
@@ -42,10 +43,9 @@ def pick_video(category: str | None, video_path: str | None, seed: int | None = 
     if category:
         cats = [c for c in cats if c.name == category]
         if not cats:
-            print(f"[test_archive] Catégorie introuvable : {category}")
-            print(
-                f"Disponibles : {[c.name for c in sorted(ARCHIVE.iterdir()) if c.is_dir()][:10]}..."
-            )
+            available = [c.name for c in sorted(ARCHIVE.iterdir()) if c.is_dir()][:10]
+            print(f"[test_archive] Category not found: {category}")
+            print(f"Available: {available}...")
             sys.exit(1)
     cat = random.choice(cats)
     vids = list(cat.glob("*.avi"))
@@ -71,29 +71,26 @@ def degrade(frame: np.ndarray, scale: int) -> np.ndarray:
 
 def main(category=None, video_path=None, sad_threshold=SAD_THRESH, ckpt_path=CKPT, seed=None):
     if not ckpt_path.exists():
-        print(f"[test_archive] Checkpoint introuvable : {ckpt_path}")
+        print(f"[test_archive] Checkpoint not found: {ckpt_path}")
         sys.exit(1)
 
     video = pick_video(category, video_path, seed=seed)
-    print(f"[test_archive] Vidéo : {video.parent.name}/{video.name}")
+    print(f"[test_archive] Video: {video.parent.name}/{video.name}")
 
     frames_hr = extract_frames(video, N_FRAMES)
     if not frames_hr:
-        print("[test_archive] Impossible de lire la vidéo.")
+        print("[test_archive] Cannot read the video.")
         sys.exit(1)
-    print(
-        f"[test_archive] {len(frames_hr)} frames extraites — résolution HR : {frames_hr[0].shape[1]}×{frames_hr[0].shape[0]}"
-    )
-    print(f"[test_archive] Checkpoint : {ckpt_path.name}")
+    h, w = frames_hr[0].shape[:2]
+    print(f"[test_archive] {len(frames_hr)} frames extracted, HR resolution {w}×{h}")
+    print(f"[test_archive] Checkpoint: {ckpt_path.name}")
 
     model = load_model(ckpt_path)
     pipeline = SadFsrcnnPipeline(model, block_size=BLOCK_SIZE, sad_threshold=sad_threshold)
 
     RESULTS_VISUALS_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(
-        f"\n{'Frame':<10} {'PSNR bic':>9} {'PSNR SR':>9} {'Δ PSNR':>7} {'SSIM bic':>9} {'SSIM SR':>8} {'Recyclé':>9} {'T inf':>7}"
-    )
+    print(f"\n{'Frame':<10} {HEADER}")
     print("-" * 78)
 
     prev_hr_y = None
@@ -123,37 +120,14 @@ def main(category=None, video_path=None, sad_threshold=SAD_THRESH, ckpt_path=CKP
     print("-" * 78)
     pb, ps, sb, ss, rec, tm = [np.mean([r[i] for r in rows]) for i in range(6)]
     print(
-        f"{'Moyenne':<10} {pb:>9.2f} {ps:>9.2f} {ps - pb:>+7.2f}"
+        f"{'Mean':<10} {pb:>9.2f} {ps:>9.2f} {ps - pb:>+7.2f}"
         f" {sb:>9.4f} {ss:>8.4f} {rec:>8.1f}% {tm:>6.1f}ms"
     )
 
-    # Visuel sur la dernière frame
+    # Figure for the last frame
     out = RESULTS_VISUALS_DIR / f"ucf101_{video.parent.name}_{video.stem}.png"
-    _save_visual(frames_hr[-1], bic, sr, p_bic, p_sr, video.name, SCALE, out)
-    print(f"\nVisuel → {out}")
-
-
-def _save_visual(hr, bic, sr, p_bic, p_sr, name, scale, out):
-    def crop(img):
-        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    fig.suptitle(f"SAD+FSRCNN (×{scale}) — {name}", fontsize=11, fontweight="bold")
-    for ax, img, title, color in [
-        (axes[0], hr, "HR référence", "#2ecc71"),
-        (axes[1], bic, f"Bicubique\nPSNR={p_bic:.2f} dB", "#95a5a6"),
-        (axes[2], sr, f"SAD+FSRCNN\nPSNR={p_sr:.2f} dB", "#3498db"),
-    ]:
-        ax.imshow(crop(img))
-        ax.set_title(title, fontsize=10)
-        ax.axis("off")
-        for s in ax.spines.values():
-            s.set_visible(True)
-            s.set_edgecolor(color)
-            s.set_linewidth(3)
-    plt.tight_layout()
-    plt.savefig(str(out), dpi=150, bbox_inches="tight")
-    plt.close(fig)
+    save_comparison(frames_hr[-1], bic, sr, p_bic, p_sr, video.name, SCALE, out)
+    print(f"\nFigure → {out}")
 
 
 if __name__ == "__main__":
@@ -168,10 +142,7 @@ if __name__ == "__main__":
         help="FSRCNN checkpoint (default: train/fsrcnn_div2k.ckpt)",
     )
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Seed pour la sélection aléatoire de la vidéo (défaut : 42)",
+        "--seed", type=int, default=42, help="seed for the random video choice (default: 42)"
     )
     args = parser.parse_args()
     main(args.category, args.video, args.threshold, ckpt_path=args.ckpt, seed=args.seed)

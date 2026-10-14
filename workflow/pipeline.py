@@ -1,4 +1,4 @@
-"""Pipeline SAD + FSRCNN : batching de blocs 16×16 non chevauchants."""
+"""SAD + FSRCNN pipeline: batched, non-overlapping 16×16 blocks."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class SadFsrcnnPipeline:
         H_hr, W_hr = H * sc, W * sc
         n_bh, n_bw = H // bs, W // bs
 
-        # ── 2. Bicubique globale (baseline blocs statiques) ──────────────────
+        # ── 2. Global bicubic (baseline for static blocks) ───────────────────
         bic_y = cv2.resize(lr_y.astype(np.float32), (W_hr, H_hr), interpolation=cv2.INTER_CUBIC)
 
         # ── 3. SAD mask ──────────────────────────────────────────────────────
@@ -56,11 +56,11 @@ class SadFsrcnnPipeline:
         n_active = len(active_pos)
         n_total = n_bh * n_bw
 
-        # ── 4. Mosaïque Y HR : bicubique par défaut, FSRCNN sur blocs actifs ─
+        # ── 4. HR Y mosaic: bicubic by default, FSRCNN on active blocks ──────
         hr_y = bic_y[: n_bh * bhr, : n_bw * bhr].copy()
 
         if n_active > 0:
-            # Pré-filtre bilatéral : atténue les artefacts de compression avant FSRCNN
+            # Bilateral pre-filter: softens compression artefacts before FSRCNN
             lr_y_clean = cv2.bilateralFilter(lr_y, d=5, sigmaColor=15, sigmaSpace=15)
             patches = np.stack(
                 [
@@ -77,14 +77,14 @@ class SadFsrcnnPipeline:
                 y_hr, x_hr = by * bhr, bx * bhr
                 hr_y[y_hr : y_hr + bhr, x_hr : x_hr + bhr] = out_np[i]
 
-        # ── 5. Lignes résiduelles si H non divisible par bs ──────────────────
+        # ── 5. Leftover rows when H is not a multiple of bs ──────────────────
         if n_bh * bhr < H_hr:
             bic_y[: n_bh * bhr, : n_bw * bhr] = hr_y
             hr_y = bic_y
 
         hr_y_u8 = np.clip(hr_y, 0, 255).astype(np.uint8)
 
-        # ── 6. Bicubic Cr/Cb + fusion BGR ────────────────────────────────────
+        # ── 6. Bicubic Cr/Cb, merge back to BGR ──────────────────────────────
         hr_cr = cv2.resize(lr_cr, (W_hr, H_hr), interpolation=cv2.INTER_CUBIC)
         hr_cb = cv2.resize(lr_cb, (W_hr, H_hr), interpolation=cv2.INTER_CUBIC)
         hr_bgr = cv2.cvtColor(cv2.merge([hr_y_u8, hr_cr, hr_cb]), cv2.COLOR_YCrCb2BGR)

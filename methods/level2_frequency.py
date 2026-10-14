@@ -1,4 +1,4 @@
-"""Niveau 2 — méthodes fréquentielles : DWT et FFT zero-padding."""
+"""Level 2 — frequency-domain methods: DWT and FFT zero-padding."""
 
 import cv2
 import numpy as np
@@ -6,7 +6,7 @@ import pywt
 
 
 def fft_zeropad(img: np.ndarray, scale: int) -> np.ndarray:
-    """Zero-padding dans le domaine fréquentiel (FFT shift)."""
+    """Zero-padding in the frequency domain (FFT shift)."""
 
     def _upscale_channel(channel: np.ndarray) -> np.ndarray:
         h, w = channel.shape
@@ -26,21 +26,21 @@ def fft_zeropad(img: np.ndarray, scale: int) -> np.ndarray:
 
 
 def dwt_upscale(img: np.ndarray, scale: int, wavelet: str = "haar") -> np.ndarray:
-    """Upscaling par montée en résolution dans l'espace ondelette.
+    """Upscaling in the wavelet domain.
 
-    Stratégie : DWT 1 niveau → upscaler chaque sous-bande (LL, LH, HL, HH)
-    par `scale` → IDWT → sortie à résolution ×scale.
-    LL est upscalé en bicubique (contenu basse fréquence) ;
-    les sous-bandes de détail sont upscalées en bilinéaire.
+    Strategy: one-level DWT → upscale each sub-band (LL, LH, HL, HH)
+    by `scale` → IDWT → output at ×scale resolution.
+    LL is upscaled bicubically (low-frequency content);
+    the detail sub-bands are upscaled bilinearly.
     """
 
     def _upscale_channel(channel: np.ndarray) -> np.ndarray:
         h, w = channel.shape
         LL, (LH, HL, HH) = pywt.dwt2(channel.astype(float), wavelet)
 
-        # upscaler chaque sous-bande par `scale` depuis sa taille réelle
-        # (les ondelettes à filtre long produisent des sous-bandes légèrement
-        # plus grandes que h//2, il ne faut pas fixer th/tw à l'avance)
+        # Upscale each sub-band by `scale` from its actual size
+        # (long-filter wavelets produce sub-bands slightly larger than h//2,
+        # so the target size must not be fixed in advance)
         sh, sw = LL.shape[0] * scale, LL.shape[1] * scale
         LL_up = cv2.resize(LL, (sw, sh), interpolation=cv2.INTER_CUBIC)
         LH_up = cv2.resize(LH, (sw, sh), interpolation=cv2.INTER_LINEAR)

@@ -1,15 +1,15 @@
-"""Extrait CLIP_DURATION secondes d'une vidéo à son FPS natif.
+"""Extract CLIP_DURATION seconds of a video at its native FPS.
 
-Structure de sortie :
+Output layout:
   data_ytb_24fps/<video_id>/frames_hr/frame_00001.png ...
-  data_ytb_24fps/<video_id>/frames_hr/fps.txt           ← FPS natif
-  data_ytb_24fps/<video_id>/frames_hr/start.txt         ← point de départ
-  data_ytb_24fps/<video_id>/frames_lr/                  ← dégradation bicubique
+  data_ytb_24fps/<video_id>/frames_hr/fps.txt           ← native FPS
+  data_ytb_24fps/<video_id>/frames_hr/start.txt         ← start point
+  data_ytb_24fps/<video_id>/frames_lr/                  ← bicubic degradation
 
-Usage :
-  python pipeline/extract_clip.py
-  python pipeline/extract_clip.py --video_id DGbwtVtthu8
-  python pipeline/extract_clip.py --video_id DGbwtVtthu8 --start 30
+Usage:
+  python -m pipeline.extract_clip
+  python -m pipeline.extract_clip --video_id DGbwtVtthu8
+  python -m pipeline.extract_clip --video_id DGbwtVtthu8 --start 30
 """
 
 import argparse
@@ -45,16 +45,16 @@ def get_native_fps(video_path: Path) -> float:
 
 
 def extract_clip(video_id: str, start: float = 0.0) -> float:
-    """Extrait CLIP_DURATION secondes à FPS natif depuis `start` secondes.
+    """Extract CLIP_DURATION seconds at native FPS from `start` seconds.
 
-    Retourne le FPS natif. Si l'extraction existe déjà avec le même `start`,
-    elle est ignorée. Si `start` a changé, les frames sont réécrasées.
+    Returns the native FPS. An extraction that already exists with the same `start`
+    is skipped; if `start` changed, the frames are overwritten.
     """
     video_path = RAW_DIR / f"{video_id}.mp4"
     if not video_path.exists():
         raise FileNotFoundError(
-            f"Vidéo source absente : {video_path}\n"
-            "Lancez d'abord pipeline/extract_frames.py pour la télécharger."
+            f"Source video missing: {video_path}\n"
+            "Run python -m pipeline.extract_frames first to download it."
         )
 
     hr_dir = RUNS_DIR / video_id / "frames_hr"
@@ -67,16 +67,14 @@ def extract_clip(video_id: str, start: float = 0.0) -> float:
         if float(start_file.read_text().strip()) == start:
             fps = float(fps_file.read_text().strip())
             print(
-                f"[extract_clip] {video_id} — {len(existing)} frames déjà présentes "
-                f"(start={start}s, {fps} fps) — ignoré."
+                f"[extract_clip] {video_id} — {len(existing)} frames already there "
+                f"(start={start}s, {fps} fps), skipped."
             )
             return fps
-        print(f"[extract_clip] {video_id} — start différent, réextraction.")
+        print(f"[extract_clip] {video_id} — different start, extracting again.")
 
     fps = get_native_fps(video_path)
-    print(
-        f"[extract_clip] {video_id} — FPS : {fps}  |  start : {start}s  |  durée : {CLIP_DURATION}s"
-    )
+    print(f"[extract_clip] {video_id} — FPS {fps} | start {start}s | duration {CLIP_DURATION}s")
 
     subprocess.run(
         [
@@ -102,12 +100,12 @@ def extract_clip(video_id: str, start: float = 0.0) -> float:
     fps_file.write_text(str(fps))
     start_file.write_text(str(start))
     n = len(list(hr_dir.glob("frame_*.png")))
-    print(f"[extract_clip] {n} frames extraites → {hr_dir}")
+    print(f"[extract_clip] {n} frames extracted → {hr_dir}")
     return fps
 
 
 def degrade_clip(video_id: str) -> None:
-    """Génère les frames LR (dégradation bicubique) pour le clip."""
+    """Generate the LR frames (bicubic degradation) of the clip."""
     hr_dir = RUNS_DIR / video_id / "frames_hr"
     lr_dir = RUNS_DIR / video_id / "frames_lr"
     lr_dir.mkdir(parents=True, exist_ok=True)
@@ -116,10 +114,10 @@ def degrade_clip(video_id: str) -> None:
     frames = sorted(hr_dir.glob("frame_*.png"))
 
     if len(list(lr_dir.glob("frame_*.png"))) == len(frames):
-        print(f"[degrade_clip] {video_id} — frames LR déjà présentes — ignoré.")
+        print(f"[degrade_clip] {video_id} — LR frames already there, skipped.")
         return
 
-    print(f"[degrade_clip] {video_id} — dégradation ×{scale}  ({len(frames)} frames)")
+    print(f"[degrade_clip] {video_id} — degrading ×{scale}  ({len(frames)} frames)")
     for f in frames:
         img = cv2.imread(str(f))
         cv2.imwrite(str(lr_dir / f.name), degrade_phase1(img, scale))
@@ -130,7 +128,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_id", default="33mqqm4QlJ8")
     parser.add_argument(
-        "--start", type=float, default=0.0, help="Début du clip en secondes (défaut : 0)"
+        "--start", type=float, default=0.0, help="clip start in seconds (default: 0)"
     )
     args = parser.parse_args()
 

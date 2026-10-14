@@ -1,4 +1,4 @@
-"""Filtrage temporel par SAD sur grille de blocs fixes."""
+"""Temporal filtering by SAD on a fixed block grid."""
 
 import numpy as np
 
@@ -9,9 +9,7 @@ def compute_sad_mask(
     block_size: int = 16,
     threshold: float = 1000.0,
 ) -> np.ndarray:
-    """
-    Retourne un masque booléen (n_bh, n_bw) où True = bloc actif (SAD >= threshold).
-    """
+    """Return a boolean (n_bh, n_bw) mask, True for an active block (SAD >= threshold)."""
     h, w = y_curr.shape
     n_bh = h // block_size
     n_bw = w // block_size

@@ -1,9 +1,9 @@
-"""Reconstruit une vidéo fluide à partir des frames SR/HR/LR d'un run.
+"""Rebuild a smooth video from the SR/HR/LR frames of a run.
 
-Usage :
-  python pipeline/reconstruct_video.py --method hr
-  python pipeline/reconstruct_video.py --method fft_zeropad
-  python pipeline/reconstruct_video.py --method dwt_haar --video_id DGbwtVtthu8
+Usage:
+  python -m pipeline.reconstruct_video --method hr
+  python -m pipeline.reconstruct_video --method fft_zeropad
+  python -m pipeline.reconstruct_video --method dwt_haar --video_id DGbwtVtthu8
 """
 
 import argparse
@@ -20,14 +20,14 @@ def get_fps(video_id: str) -> float:
     fps_file = RUNS_DIR / video_id / "frames_hr" / "fps.txt"
     if not fps_file.exists():
         raise FileNotFoundError(
-            f"fps.txt introuvable dans {RUNS_DIR / video_id / 'frames_hr'}.\n"
-            "Lancez d'abord : python pipeline/extract_clip.py"
+            f"fps.txt not found in {RUNS_DIR / video_id / 'frames_hr'}.\n"
+            "Run first: python -m pipeline.extract_clip"
         )
     return float(fps_file.read_text().strip())
 
 
 def apply_sr(video_id: str, method_name: str, fn) -> Path:
-    """Applique fn(lr, scale) sur toutes les frames LR du run. Retourne le dossier SR."""
+    """Apply fn(lr, scale) to every LR frame of the run. Return the SR folder."""
     lr_dir = RUNS_DIR / video_id / "frames_lr"
     sr_dir = RUNS_DIR / video_id / "frames_sr" / method_name
     sr_dir.mkdir(parents=True, exist_ok=True)
@@ -36,7 +36,7 @@ def apply_sr(video_id: str, method_name: str, fn) -> Path:
     frames = sorted(lr_dir.glob("frame_*.png"))
 
     if len(list(sr_dir.glob("frame_*.png"))) == len(frames):
-        print(f"[apply_sr] {method_name}/{video_id} — frames déjà présentes — ignoré.")
+        print(f"[apply_sr] {method_name}/{video_id} — frames already there, skipped.")
         return sr_dir
 
     print(f"[apply_sr] {method_name}  {len(frames)} frames ×{scale} …")
@@ -85,7 +85,7 @@ def reconstruct(video_id: str, method_name: str, fn=None) -> None:
         frames_dir = apply_sr(video_id, "lr_bicubic", lambda img, s: l1.upscale(img, s, "bicubic"))
     else:
         if fn is None:
-            raise ValueError("fn requis pour une méthode SR custom.")
+            raise ValueError("fn is required for a custom SR method.")
         frames_dir = apply_sr(video_id, method_name, fn)
 
     frames_to_video(frames_dir, out_path, fps)
@@ -94,19 +94,17 @@ def reconstruct(video_id: str, method_name: str, fn=None) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_id", default="33mqqm4QlJ8")
-    parser.add_argument(
-        "--method", default="fft_zeropad", help="Nom de la méthode SR, ou 'hr' / 'lr'"
-    )
+    parser.add_argument("--method", default="fft_zeropad", help="SR method name, or 'hr' / 'lr'")
     args = parser.parse_args()
 
     import methods.level2_frequency as l2
 
-    METHOD_MAP = {
+    method_map = {
         "bicubic": lambda img, s: l1.upscale(img, s, "bicubic"),
         "fft_zeropad": lambda img, s: l2.fft_zeropad(img, s),
         "dwt_haar": lambda img, s: l2.dwt_upscale(img, s, wavelet="haar"),
         "dwt_db2": lambda img, s: l2.dwt_upscale(img, s, wavelet="db2"),
     }
 
-    fn = METHOD_MAP.get(args.method)
+    fn = method_map.get(args.method)
     reconstruct(args.video_id, args.method, fn)

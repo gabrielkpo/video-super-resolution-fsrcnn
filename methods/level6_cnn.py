@@ -1,9 +1,6 @@
-"""Niveau 6 — Super-résolution par CNN : FSRCNN (Dong et al., ECCV 2016).
+"""Level 6 — CNN super-resolution: FSRCNN (Dong et al., ECCV 2016).
 
-Checkpoint de référence pré-entraîné : train/fsrcnn_div2k.ckpt
-
-Usage standalone :
-    python methods/level6_cnn.py --ckpt train/fsrcnn_div2k.ckpt
+Reference pre-trained checkpoint: train/fsrcnn_div2k.ckpt
 """
 
 from __future__ import annotations
@@ -26,10 +23,10 @@ DEFAULT_CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
 class FSRCNN(nn.Module):
     """Fast Super-Resolution CNN — Dong et al., ECCV 2016.
 
-    FSRCNN(d, s, m) :
-        d  = dimension des features LR (extraction)
-        s  = dimension compressée (shrinking/expanding)
-        m  = nombre de couches de mapping non-linéaire
+    FSRCNN(d, s, m):
+        d = LR feature dimension (extraction)
+        s = shrunk dimension (shrinking/expanding)
+        m = number of non-linear mapping layers
     """
 
     def __init__(self, scale: int = 4, d: int = 56, s: int = 12, m: int = 4) -> None:
@@ -63,11 +60,11 @@ class FSRCNN(nn.Module):
         return self.deconv(x)
 
 
-# ── Chargement ───────────────────────────────────────────────────────────────
+# ── Loading ──────────────────────────────────────────────────────────────────
 
 
 def load_model(ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE) -> FSRCNN:
-    """Charge un checkpoint en détectant automatiquement d, s, m."""
+    """Load a checkpoint, inferring d, s and m from the weights."""
     ckpt = torch.load(str(ckpt_path), map_location=device)
     state_dict = ckpt["model"] if "model" in ckpt else ckpt
     d = state_dict["feature.0.weight"].shape[0]
@@ -79,16 +76,16 @@ def load_model(ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE) -> FS
     return model.to(device)
 
 
-# ── Inférence ────────────────────────────────────────────────────────────────
+# ── Inference ────────────────────────────────────────────────────────────────
 
 
 def upscale(
     img: np.ndarray, scale: int, ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE
 ) -> np.ndarray:
-    """Interface standard niveau 6 : SR couleur pleine image.
+    """Level 6 standard interface: full-image colour SR.
 
-    Traite le canal Y avec FSRCNN, Cr/Cb en bicubique.
-    Signature identique aux autres niveaux (img, scale).
+    FSRCNN on the Y channel, bicubic on Cr/Cb.
+    Same signature as the other levels (img, scale).
     """
     model = load_model(ckpt_path, device)
     return _infer(img, model, scale, device)
@@ -97,7 +94,7 @@ def upscale(
 def _infer(
     img: np.ndarray, model: FSRCNN, scale: int | None = None, device: str = DEVICE
 ) -> np.ndarray:
-    """Inférence interne : FSRCNN sur Y, bicubique sur Cr/Cb."""
+    """Internal inference: FSRCNN on Y, bicubic on Cr/Cb."""
     model.eval().to(device)
     sc = scale or model.scale
     h, w = img.shape[:2]

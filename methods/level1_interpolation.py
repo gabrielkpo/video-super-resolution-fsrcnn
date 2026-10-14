@@ -1,9 +1,9 @@
-"""Niveau 1 — interpolations classiques : bicubique, bilinéaire, Lanczos.
+"""Level 1 — classical interpolation: bicubic, bilinear, Lanczos.
 
-Usage (comparaison visuelle + métriques) :
-    python methods/level1_interpolation.py
-    python methods/level1_interpolation.py --video_id 33mqqm4QlJ8 --frame 5
-    python methods/level1_interpolation.py --patch 200 300 128 128
+Usage (visual comparison and metrics):
+    python -m methods.level1_interpolation
+    python -m methods.level1_interpolation --video_id 33mqqm4QlJ8 --frame 5
+    python -m methods.level1_interpolation --patch 200 300 128 128
 """
 
 import cv2
@@ -19,7 +19,7 @@ _METHODS = {
 
 def upscale(img: np.ndarray, scale: int, method: str = "bicubic") -> np.ndarray:
     if method not in _METHODS:
-        raise ValueError(f"Méthode inconnue : {method}. Choix : {list(_METHODS)}")
+        raise ValueError(f"Unknown method: {method}. Choices: {list(_METHODS)}")
     h, w = img.shape[:2]
     return cv2.resize(img, (w * scale, h * scale), interpolation=_METHODS[method])
 
@@ -53,17 +53,17 @@ if __name__ == "__main__":
         nargs=4,
         metavar=("X", "Y", "W", "H"),
         default=None,
-        help="Patch sur l'image HR (défaut : centre)",
+        help="patch of the HR image (default: centre)",
     )
     args = parser.parse_args()
 
-    # Détection automatique du video_id
+    # Pick the video_id automatically
     if args.video_id:
         video_id = args.video_id
     else:
         dirs = [d for d in FRAMES_LR_PHASE1_DIR.iterdir() if d.is_dir()]
         if not dirs:
-            print("Aucune donnée LR trouvée. Lancez d'abord extract_frames.py et degrade.py.")
+            print("No LR data found. Run pipeline.extract_frames and pipeline.degrade first.")
             sys.exit(1)
         video_id = dirs[0].name
 
@@ -72,11 +72,11 @@ if __name__ == "__main__":
     lr = cv2.imread(str(FRAMES_LR_PHASE1_DIR / video_id / frame_name))
     hr = cv2.imread(str(FRAMES_HR_DIR / video_id / frame_name))
     if lr is None or hr is None:
-        print(f"Frame {frame_name} introuvable.")
+        print(f"Frame {frame_name} not found.")
         sys.exit(1)
 
-    # Upscaling + métriques
-    print(f"{'Méthode':<12} {'PSNR':>8} {'SSIM':>8} {'Tinf (ms)':>10}")
+    # Upscaling and metrics
+    print(f"{'Method':<12} {'PSNR':>8} {'SSIM':>8} {'Tinf (ms)':>10}")
     print("-" * 42)
     results = {}
     for name in ("bilinear", "bicubic", "lanczos"):
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         results[name] = sr
         print(f"{name:<12} {m['psnr']:>8.2f} {m['ssim']:>8.4f} {tinf:>10.2f}")
 
-    # Figure 1 : comparaison visuelle sur un patch
+    # Figure 1: visual comparison on a patch
     h_hr, w_hr = hr.shape[:2]
     if args.patch:
         px, py, pw, ph = args.patch
@@ -99,18 +99,18 @@ if __name__ == "__main__":
         return cv2.cvtColor(img[py : py + ph, px : px + pw], cv2.COLOR_BGR2RGB)
 
     panels = {
-        "Référence HR": patch(hr),
-        "Bilinéaire": patch(results["bilinear"]),
-        "Bicubique": patch(results["bicubic"]),
+        "HR reference": patch(hr),
+        "Bilinear": patch(results["bilinear"]),
+        "Bicubic": patch(results["bicubic"]),
         "Lanczos": patch(results["lanczos"]),
     }
 
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-    for ax, (title, img) in zip(axes, panels.items(), strict=False):
+    for ax, (title, img) in zip(axes, panels.items(), strict=True):
         ax.imshow(img)
         ax.set_title(title, fontsize=12)
         ax.axis("off")
-    fig.suptitle(f"Niveau 1 — Interpolations ×{scale} | {video_id} / {frame_name}", fontsize=10)
+    fig.suptitle(f"Level 1 — interpolation ×{scale} | {video_id} / {frame_name}", fontsize=10)
     plt.tight_layout()
 
     RESULTS_VISUALS_DIR.mkdir(parents=True, exist_ok=True)

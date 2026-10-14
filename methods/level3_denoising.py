@@ -1,4 +1,4 @@
-"""Niveau 3 — débruitage + upscaling : bilatéral, NLM, BM3D."""
+"""Level 3 — denoising then upscaling: bilateral, NLM, BM3D."""
 
 import cv2
 import numpy as np
@@ -34,7 +34,7 @@ def nlm_sr(
 
 def bm3d_sr(img: np.ndarray, scale: int, sigma_psd: float = 25) -> np.ndarray:
     if not _BM3D_AVAILABLE:
-        raise ImportError("bm3d non installé : pip install bm3d")
+        raise ImportError("bm3d is not installed: pip install bm3d")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
     denoised = _bm3d_lib.bm3d(gray.astype(float) / 255.0, sigma_psd / 255.0)
     denoised = np.clip(denoised * 255, 0, 255).astype(np.uint8)

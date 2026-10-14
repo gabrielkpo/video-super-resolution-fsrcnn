@@ -1,13 +1,12 @@
-"""Benchmark FSRCNN sur le test set Vimeo-90K.
+"""FSRCNN benchmark on the Vimeo-90K test split.
 
-Compare bicubique / FSRCNN DIV2K / FSRCNN Vimeo fine-tuné sur le canal Y.
-Produit un tableau résumé et un CSV dans green_sr/results/.
+Compares bicubic / FSRCNN DIV2K / FSRCNN fine-tuned on Vimeo, on the Y channel.
+Writes a summary table and a CSV in results/.
 
-Usage :
-    cd green_sr
-    python train/benchmark_vimeo.py
-    python train/benchmark_vimeo.py --max-clips 100   # test rapide
-    python train/benchmark_vimeo.py --frame im4       # 1 frame/clip seulement
+Usage:
+    python -m train.benchmark_vimeo
+    python -m train.benchmark_vimeo --max-clips 100   # quick run
+    python -m train.benchmark_vimeo --frame im4       # one frame per clip only
 """
 
 from __future__ import annotations
@@ -22,13 +21,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from config import DEVICE
+from config import DATA_DISK, DEVICE
 from methods.level6_cnn import load_model
 
-DISK = Path("/Volumes/DisqueGab")
-LR_ROOT = DISK / "vimeo_sr" / "sequences_lr"
-HR_ROOT = DISK / "vimeo_septuplet" / "sequences"
-SPLITS = DISK / "vimeo_sr" / "splits"
+LR_ROOT = DATA_DISK / "vimeo_sr" / "sequences_lr"
+HR_ROOT = DATA_DISK / "vimeo_septuplet" / "sequences"
+SPLITS = DATA_DISK / "vimeo_sr" / "splits"
 
 CKPT_DIV2K = Path(__file__).parent / "fsrcnn_div2k.ckpt"
 CKPT_VIMEO = Path(__file__).parent / "fsrcnn_vimeo_best.ckpt"
@@ -37,7 +35,7 @@ RESULTS = Path(__file__).parent.parent / "results"
 SCALE = 4
 
 
-# ── Métriques sur canal Y ────────────────────────────────────────────────────
+# ── Y-channel metrics ────────────────────────────────────────────────────────
 
 
 def psnr_y(hr_bgr: np.ndarray, sr_bgr: np.ndarray) -> float:
@@ -55,7 +53,7 @@ def ssim_y(hr_bgr: np.ndarray, sr_bgr: np.ndarray) -> float:
     return structural_similarity(hr_y, sr_y, data_range=255)
 
 
-# ── SR bicubique ─────────────────────────────────────────────────────────────
+# ── Bicubic SR ───────────────────────────────────────────────────────────────
 
 
 def bicubic_sr(lr_bgr: np.ndarray) -> np.ndarray:
@@ -63,15 +61,15 @@ def bicubic_sr(lr_bgr: np.ndarray) -> np.ndarray:
     return cv2.resize(lr_bgr, (w * SCALE, h * SCALE), interpolation=cv2.INTER_CUBIC)
 
 
-# ── SR FSRCNN ────────────────────────────────────────────────────────────────
+# ── FSRCNN SR ────────────────────────────────────────────────────────────────
 
 
-def fsrcnn_sr(lr_bgr: np.ndarray, model: torch.nn.Module) -> np.ndarray:
+def fsrcnn_sr(lr_bgr: np.ndarray, model: torch.nn.Module, device: str) -> np.ndarray:
     h, w = lr_bgr.shape[:2]
     ycrcb = cv2.cvtColor(lr_bgr, cv2.COLOR_BGR2YCrCb)
     y, cr, cb = cv2.split(ycrcb)
 
-    t = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(DEVICE)
+    t = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(device)
     with torch.no_grad():
         y_sr = model(t).squeeze().cpu().numpy()
     y_sr = np.clip(y_sr * 255, 0, 255).astype(np.uint8)
@@ -86,16 +84,15 @@ def fsrcnn_sr(lr_bgr: np.ndarray, model: torch.nn.Module) -> np.ndarray:
 
 
 def main(max_clips: int, frames: list[str]) -> None:
-
-    if not DISK.exists():
-        print(f"[benchmark] DisqueGab non monté : {DISK}")
+    if not DATA_DISK.exists():
+        print(f"[benchmark] Data disk not mounted: {DATA_DISK} (set VSR_DATA_DISK)")
         sys.exit(1)
 
-    # Chargement des clips de test
-    test_file = SPLITS / "test.txt"
-    clips = [l.strip() for l in test_file.read_text().splitlines() if l.strip()]
+    # Test clips
+    lines = (SPLITS / "test.txt").read_text().splitlines()
+    clips = [line.strip() for line in lines if line.strip()]
 
-    # Filtre clips cassés (im4 absent)
+    # Drop broken clips (missing im4)
     valid = [
         c
         for c in clips
@@ -103,24 +100,22 @@ def main(max_clips: int, frames: list[str]) -> None:
     ]
     n_bad = len(clips) - len(valid)
     if n_bad:
-        print(f"  {n_bad} clips exclus (im4 manquant)")
+        print(f"  {n_bad} clips excluded (missing im4)")
 
     if max_clips > 0:
         valid = valid[:max_clips]
 
+    n_images = len(valid) * len(frames)
     print(f"Device       : {DEVICE}")
-    print(
-        f"Test clips   : {len(valid)}  ×  {len(frames)} frame(s) = {len(valid) * len(frames)} images"
-    )
+    print(f"Test clips   : {len(valid)}  ×  {len(frames)} frame(s) = {n_images} images")
     print(f"Checkpoints  : {CKPT_DIV2K.name}  /  {CKPT_VIMEO.name}")
 
-    # Chargement des modèles
-    print("\nChargement des modèles…")
+    print("\nLoading the models…")
     model_div2k = load_model(CKPT_DIV2K, device=DEVICE)
     model_vimeo = load_model(CKPT_VIMEO, device=DEVICE)
     print("  OK")
 
-    # Boucle de benchmark
+    # Benchmark loop: per method, [psnr_sum, ssim_sum]
     sums = {"bic": [0.0, 0.0], "div2k": [0.0, 0.0], "vimeo": [0.0, 0.0]}
     n_evaluated = 0
     rows = []
@@ -128,42 +123,25 @@ def main(max_clips: int, frames: list[str]) -> None:
     bar = tqdm(valid, desc="Benchmark", unit="clip", ncols=90)
     for clip in bar:
         for fr in frames:
-            lr_path = LR_ROOT / clip / f"{fr}.png"
-            hr_path = HR_ROOT / clip / f"{fr}.png"
-
-            lr_bgr = cv2.imread(str(lr_path))
-            hr_bgr = cv2.imread(str(hr_path))
+            lr_bgr = cv2.imread(str(LR_ROOT / clip / f"{fr}.png"))
+            hr_bgr = cv2.imread(str(HR_ROOT / clip / f"{fr}.png"))
             if lr_bgr is None or hr_bgr is None:
                 continue
 
-            bic = bicubic_sr(lr_bgr)
-            sr_d = fsrcnn_sr(lr_bgr, model_div2k)
-            sr_v = fsrcnn_sr(lr_bgr, model_vimeo)
-
-            pb, sb = psnr_y(hr_bgr, bic), ssim_y(hr_bgr, bic)
-            pd, sd = psnr_y(hr_bgr, sr_d), ssim_y(hr_bgr, sr_d)
-            pv, sv = psnr_y(hr_bgr, sr_v), ssim_y(hr_bgr, sr_v)
-
-            sums["bic"][0] += pb
-            sums["bic"][1] += sb
-            sums["div2k"][0] += pd
-            sums["div2k"][1] += sd
-            sums["vimeo"][0] += pv
-            sums["vimeo"][1] += sv
+            outputs = {
+                "bic": bicubic_sr(lr_bgr),
+                "div2k": fsrcnn_sr(lr_bgr, model_div2k, DEVICE),
+                "vimeo": fsrcnn_sr(lr_bgr, model_vimeo, DEVICE),
+            }
+            row = {"clip": clip, "frame": fr}
+            for name, sr in outputs.items():
+                p, s = psnr_y(hr_bgr, sr), ssim_y(hr_bgr, sr)
+                sums[name][0] += p
+                sums[name][1] += s
+                row[f"psnr_{name}"] = round(p, 4)
+                row[f"ssim_{name}"] = round(s, 4)
+            rows.append(row)
             n_evaluated += 1
-
-            rows.append(
-                {
-                    "clip": clip,
-                    "frame": fr,
-                    "psnr_bic": round(pb, 4),
-                    "ssim_bic": round(sb, 4),
-                    "psnr_div2k": round(pd, 4),
-                    "ssim_div2k": round(sd, 4),
-                    "psnr_vimeo": round(pv, 4),
-                    "ssim_vimeo": round(sv, 4),
-                }
-            )
 
         bar.set_postfix_str(
             f"PSNR bic={sums['bic'][0] / max(n_evaluated, 1):.2f} "
@@ -173,28 +151,22 @@ def main(max_clips: int, frames: list[str]) -> None:
     bar.close()
 
     if n_evaluated == 0:
-        print("Aucune image évaluée.")
+        print("No image evaluated.")
         sys.exit(1)
 
-    # Moyennes
-    mb_p = sums["bic"][0] / n_evaluated
-    mb_s = sums["bic"][1] / n_evaluated
-    md_p = sums["div2k"][0] / n_evaluated
-    md_s = sums["div2k"][1] / n_evaluated
-    mv_p = sums["vimeo"][0] / n_evaluated
-    mv_s = sums["vimeo"][1] / n_evaluated
+    mb_p, mb_s = (v / n_evaluated for v in sums["bic"])
+    md_p, md_s = (v / n_evaluated for v in sums["div2k"])
+    mv_p, mv_s = (v / n_evaluated for v in sums["vimeo"])
 
-    # Affichage
     print(f"\n{'─' * 60}")
-    print(f"{'Méthode':<22}  {'PSNR Y (dB)':>12}  {'SSIM Y':>8}  {'ΔPSNR':>7}")
+    print(f"{'Method':<22}  {'PSNR Y (dB)':>12}  {'SSIM Y':>8}  {'ΔPSNR':>7}")
     print(f"{'─' * 60}")
-    print(f"{'Bicubique (baseline)':<22}  {mb_p:>12.4f}  {mb_s:>8.4f}  {'—':>7}")
+    print(f"{'Bicubic (baseline)':<22}  {mb_p:>12.4f}  {mb_s:>8.4f}  {'—':>7}")
     print(f"{'FSRCNN DIV2K':<22}  {md_p:>12.4f}  {md_s:>8.4f}  {md_p - mb_p:>+7.4f}")
     print(f"{'FSRCNN Vimeo (ft)':<22}  {mv_p:>12.4f}  {mv_s:>8.4f}  {mv_p - mb_p:>+7.4f}")
     print(f"{'─' * 60}")
-    print(f"  Images évaluées : {n_evaluated}")
+    print(f"  Images evaluated: {n_evaluated}")
 
-    # Sauvegarde CSV
     RESULTS.mkdir(parents=True, exist_ok=True)
     csv_path = RESULTS / "benchmark_vimeo.csv"
     with open(csv_path, "w", newline="") as f:
@@ -202,30 +174,27 @@ def main(max_clips: int, frames: list[str]) -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    # Sauvegarde résumé
     summary_path = RESULTS / "benchmark_vimeo_summary.txt"
     with open(summary_path, "w") as f:
-        f.write(f"Benchmark Vimeo test set — {n_evaluated} images\n")
+        f.write(f"Vimeo test split benchmark — {n_evaluated} images\n")
         f.write(f"Device: {DEVICE}\n\n")
-        f.write(f"{'Méthode':<22}  {'PSNR Y':>10}  {'SSIM Y':>8}  {'ΔPSNR':>7}\n")
-        f.write(f"{'Bicubique':<22}  {mb_p:>10.4f}  {mb_s:>8.4f}  {'—':>7}\n")
+        f.write(f"{'Method':<22}  {'PSNR Y':>10}  {'SSIM Y':>8}  {'ΔPSNR':>7}\n")
+        f.write(f"{'Bicubic':<22}  {mb_p:>10.4f}  {mb_s:>8.4f}  {'—':>7}\n")
         f.write(f"{'FSRCNN DIV2K':<22}  {md_p:>10.4f}  {md_s:>8.4f}  {md_p - mb_p:>+7.4f}\n")
         f.write(f"{'FSRCNN Vimeo (ft)':<22}  {mv_p:>10.4f}  {mv_s:>8.4f}  {mv_p - mb_p:>+7.4f}\n")
 
     print(f"\nCSV     → {csv_path}")
-    print(f"Résumé  → {summary_path}")
+    print(f"Summary → {summary_path}")
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Benchmark FSRCNN vs bicubique sur test Vimeo.")
-    ap.add_argument(
-        "--max-clips", type=int, default=0, help="Limite de clips (0 = tous, défaut: tous)"
-    )
+    ap = argparse.ArgumentParser(description="FSRCNN vs bicubic on the Vimeo test split.")
+    ap.add_argument("--max-clips", type=int, default=0, help="clip limit (0 = all, the default)")
     ap.add_argument(
         "--frame",
         type=str,
         default="all",
-        help="Frame(s) à évaluer : 'all' (défaut), 'im4', ou 'im1,im4,im7'",
+        help="frame(s) to evaluate: 'all' (default), 'im4', or 'im1,im4,im7'",
     )
     args = ap.parse_args()
 

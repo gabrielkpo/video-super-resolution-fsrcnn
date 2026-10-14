@@ -1,4 +1,4 @@
-"""PSNR, SSIM, et métriques énergétiques via CodeCarbon."""
+"""PSNR, SSIM and energy metrics through CodeCarbon."""
 
 from contextlib import contextmanager
 
@@ -26,7 +26,7 @@ def ssim(hr: np.ndarray, sr: np.ndarray) -> float:
 
 @contextmanager
 def energy_tracker(name: str = "run"):
-    """Context manager retournant (emissions_kg, energy_kwh) à la sortie."""
+    """Context manager yielding a callable that returns (emissions_kg, energy_kwh) on exit."""
     if not _CODECARBON:
         yield lambda: (None, None)
         return

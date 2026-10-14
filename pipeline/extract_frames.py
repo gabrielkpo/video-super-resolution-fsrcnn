@@ -1,8 +1,8 @@
-"""Extraction de frames depuis une vidéo via ffmpeg + téléchargement yt-dlp.
+"""Download a video with yt-dlp and extract its frames with ffmpeg.
 
-Usage :
-    python pipeline/extract_frames.py
-    python pipeline/extract_frames.py --url <URL_YouTube> --fps 1
+Usage:
+    python -m pipeline.extract_frames
+    python -m pipeline.extract_frames --url <YouTube URL> --fps 1
 """
 
 import argparse
@@ -18,11 +18,11 @@ def download_video(url: str) -> Path:
     output_path = RAW_DIR / f"{video_id}.mp4"
 
     if output_path.exists():
-        print(f"[download] Déjà présent : {output_path} — ignoré.")
+        print(f"[download] Already there: {output_path}, skipped.")
         return output_path
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"[download] Téléchargement de {url} ...")
+    print(f"[download] Downloading {url} ...")
     cmd = [
         "yt-dlp",
         "--format",
@@ -36,15 +36,15 @@ def download_video(url: str) -> Path:
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
-        raise RuntimeError(f"yt-dlp a échoué pour : {url}")
+        raise RuntimeError(f"yt-dlp failed for: {url}")
 
     candidates = list(RAW_DIR.glob(f"{video_id}.*"))
     if not candidates:
-        raise FileNotFoundError(f"Aucun fichier trouvé après téléchargement ({video_id})")
+        raise FileNotFoundError(f"No file found after the download ({video_id})")
     downloaded = candidates[0]
     if downloaded.suffix != ".mp4":
         downloaded = downloaded.rename(output_path)
-    print(f"[download] OK — {downloaded}  ({downloaded.stat().st_size / 1e6:.1f} Mo)")
+    print(f"[download] OK — {downloaded}  ({downloaded.stat().st_size / 1e6:.1f} MB)")
     return downloaded
 
 
@@ -63,7 +63,7 @@ def extract_frames(
 
     existing = list(output_dir.glob("frame_*.png"))
     if existing:
-        print(f"[extract_frames] {len(existing)} frames déjà présentes — ignoré.")
+        print(f"[extract_frames] {len(existing)} frames already there, skipped.")
         return len(existing)
 
     pattern = output_dir / "frame_%05d.png"
@@ -80,14 +80,14 @@ def extract_frames(
         raise RuntimeError(f"ffmpeg error:\n{result.stderr}")
 
     frames = list(output_dir.glob("frame_*.png"))
-    print(f"[extract_frames] {len(frames)} frames extraites → {output_dir}")
+    print(f"[extract_frames] {len(frames)} frames extracted → {output_dir}")
     return len(frames)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--url", default=VIDEO_URL2, help="URL YouTube (défaut : VIDEO_URL dans config.py)"
+        "--url", default=VIDEO_URL2, help="YouTube URL (default: VIDEO_URL2 in config.py)"
     )
     parser.add_argument("--fps", type=int, default=EXTRACT_FPS)
     parser.add_argument("--max_frames", type=int, default=None)
