@@ -1,24 +1,22 @@
-"""Entraînement du Sparse Coding SR.
+"""Train the sparse-coding SR model.
 
-Sources disponibles :
-    --source div2k    (défaut) : 100 images DIV2K haute qualité
-    --source frames   : toutes les frames benchmark (1 FPS, très diversifiées)
+Available sources:
+    --source div2k    (default): 100 high-quality DIV2K images
+    --source frames   : every benchmark frame (1 FPS, very diverse)
+    --source combined : both
 
-Usage :
-    python train/train_sparse.py --source frames
-    python train/train_sparse.py --source div2k --n_imgs 100
+Usage:
+    python -m train.train_sparse --source frames
+    python -m train.train_sparse --source div2k --n_imgs 100
 """
-import sys
-import warnings
+
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
 
-warnings.filterwarnings("ignore")
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import DIV2K_DIR, SCALE_FACTOR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR
+from config import DIV2K_DIR, FRAMES_HR_DIR, FRAMES_LR_PHASE1_DIR, SCALE_FACTOR
 from methods.level4_ml_classic import SparseSR
 
 MODEL_PATH = Path(__file__).parent / "sparse_sr.joblib"
@@ -29,8 +27,8 @@ def load_div2k_pairs(n_imgs: int, scale: int) -> list:
     lr_dir = DIV2K_DIR / f"DIV2K_train_LR_bicubic_X{scale}" / f"X{scale}"
 
     if not hr_dir.exists():
-        print(f"[train_sparse] DIV2K introuvable : {hr_dir}")
-        print("  → Télécharger depuis https://data.vision.ee.ethz.ch/cvl/DIV2K/")
+        print(f"[train_sparse] DIV2K not found: {hr_dir}")
+        print("  → Download it from https://data.vision.ee.ethz.ch/cvl/DIV2K/")
         sys.exit(1)
 
     pairs = []
@@ -39,14 +37,14 @@ def load_div2k_pairs(n_imgs: int, scale: int) -> list:
         if hr_img is None:
             continue
         lr_path = lr_dir / f"{hr_path.stem}x{scale}.png"
-        lr_img  = cv2.imread(str(lr_path)) if lr_path.exists() else _degrade(hr_img, scale)
+        lr_img = cv2.imread(str(lr_path)) if lr_path.exists() else _degrade(hr_img, scale)
         if lr_img is not None:
             pairs.append((lr_img, hr_img))
     return pairs
 
 
 def load_frames_pairs() -> list:
-    """Charge toutes les frames benchmark (1 FPS) — diversité maximale disponible localement."""
+    """Load every benchmark frame (1 FPS), the most diverse data available locally."""
     pairs = []
     for lr_video_dir in sorted(FRAMES_LR_PHASE1_DIR.iterdir()):
         if not lr_video_dir.is_dir():
@@ -70,31 +68,36 @@ def _degrade(hr_img, scale: int):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source",     choices=["div2k", "frames", "combined"], default="div2k")
-    parser.add_argument("--n_imgs",     type=int, default=100, help="Nb images DIV2K (ignoré si --source frames)")
-    parser.add_argument("--n_atoms",    type=int, default=256)
-    parser.add_argument("--n_nonzero",  type=int, default=3)
+    parser.add_argument("--source", choices=["div2k", "frames", "combined"], default="div2k")
+    parser.add_argument(
+        "--n_imgs",
+        type=int,
+        default=100,
+        help="number of DIV2K images (ignored with --source frames)",
+    )
+    parser.add_argument("--n_atoms", type=int, default=256)
+    parser.add_argument("--n_nonzero", type=int, default=3)
     parser.add_argument("--patch_size", type=int, default=8)
     args = parser.parse_args()
 
     if args.source == "frames":
-        print("[train_sparse] Source : frames benchmark (1 FPS)…")
+        print("[train_sparse] Source: benchmark frames (1 FPS)…")
         pairs = load_frames_pairs()
     elif args.source == "combined":
         scale = SCALE_FACTOR
-        print(f"[train_sparse] Source : DIV2K ({args.n_imgs} images) + frames benchmark…")
+        print(f"[train_sparse] Source: DIV2K ({args.n_imgs} images) + benchmark frames…")
         pairs = load_div2k_pairs(args.n_imgs, scale) + load_frames_pairs()
-        print(f"[train_sparse] {len(pairs)} paires au total.")
+        print(f"[train_sparse] {len(pairs)} pairs in total.")
     else:
         scale = SCALE_FACTOR
-        print(f"[train_sparse] Source : DIV2K ({args.n_imgs} images, ×{scale})…")
+        print(f"[train_sparse] Source: DIV2K ({args.n_imgs} images, ×{scale})…")
         pairs = load_div2k_pairs(args.n_imgs, scale)
 
     if not pairs:
-        print("[train_sparse] Aucune paire chargée.")
+        print("[train_sparse] No pair loaded.")
         sys.exit(1)
 
-    print(f"[train_sparse] {len(pairs)} paires chargées.")
+    print(f"[train_sparse] {len(pairs)} pairs loaded.")
 
     model = SparseSR(
         n_atoms=args.n_atoms,

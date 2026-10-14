@@ -1,16 +1,15 @@
-"""PSNR, SSIM, et métriques énergétiques via CodeCarbon."""
-import sys
-from pathlib import Path
+"""PSNR, SSIM and energy metrics through CodeCarbon."""
+
 from contextlib import contextmanager
 
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import COUNTRY_ISO
 
 try:
     from codecarbon import EmissionsTracker
+
     _CODECARBON = True
 except ImportError:
     _CODECARBON = False
@@ -27,7 +26,7 @@ def ssim(hr: np.ndarray, sr: np.ndarray) -> float:
 
 @contextmanager
 def energy_tracker(name: str = "run"):
-    """Context manager retournant (emissions_kg, energy_kwh) à la sortie."""
+    """Context manager yielding a callable that returns (emissions_kg, energy_kwh) on exit."""
     if not _CODECARBON:
         yield lambda: (None, None)
         return

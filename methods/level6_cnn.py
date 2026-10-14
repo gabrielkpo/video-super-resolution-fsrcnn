@@ -1,12 +1,10 @@
-"""Niveau 6 — Super-résolution par CNN : FSRCNN (Dong et al., ECCV 2016).
+"""Level 6 — CNN super-resolution: FSRCNN (Dong et al., ECCV 2016).
 
-Checkpoint de référence pré-entraîné : train/fsrcnn_div2k.ckpt
-
-Usage standalone :
-    python methods/level6_cnn.py --ckpt train/fsrcnn_div2k.ckpt
+Reference pre-trained checkpoint: train/fsrcnn_div2k.ckpt
 """
+
 from __future__ import annotations
-import sys
+
 from pathlib import Path
 
 import cv2
@@ -14,7 +12,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import DEVICE
 
 DEFAULT_CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
@@ -22,14 +19,16 @@ DEFAULT_CKPT = Path(__file__).parent.parent / "train" / "fsrcnn_div2k.ckpt"
 
 # ── Architecture ─────────────────────────────────────────────────────────────
 
+
 class FSRCNN(nn.Module):
     """Fast Super-Resolution CNN — Dong et al., ECCV 2016.
 
-    FSRCNN(d, s, m) :
-        d  = dimension des features LR (extraction)
-        s  = dimension compressée (shrinking/expanding)
-        m  = nombre de couches de mapping non-linéaire
+    FSRCNN(d, s, m):
+        d = LR feature dimension (extraction)
+        s = shrunk dimension (shrinking/expanding)
+        m = number of non-linear mapping layers
     """
+
     def __init__(self, scale: int = 4, d: int = 56, s: int = 12, m: int = 4) -> None:
         super().__init__()
         self.scale = scale
@@ -61,12 +60,12 @@ class FSRCNN(nn.Module):
         return self.deconv(x)
 
 
-# ── Chargement ───────────────────────────────────────────────────────────────
+# ── Loading ──────────────────────────────────────────────────────────────────
 
-def load_model(ckpt_path: str | Path = DEFAULT_CKPT,
-               device: str = DEVICE) -> FSRCNN:
-    """Charge un checkpoint en détectant automatiquement d, s, m."""
-    ckpt       = torch.load(str(ckpt_path), map_location=device)
+
+def load_model(ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE) -> FSRCNN:
+    """Load a checkpoint, inferring d, s and m from the weights."""
+    ckpt = torch.load(str(ckpt_path), map_location=device)
     state_dict = ckpt["model"] if "model" in ckpt else ckpt
     d = state_dict["feature.0.weight"].shape[0]
     s = state_dict["shrink.0.weight"].shape[0]
@@ -77,31 +76,33 @@ def load_model(ckpt_path: str | Path = DEFAULT_CKPT,
     return model.to(device)
 
 
-# ── Inférence ────────────────────────────────────────────────────────────────
+# ── Inference ────────────────────────────────────────────────────────────────
 
-def upscale(img: np.ndarray, scale: int,
-            ckpt_path: str | Path = DEFAULT_CKPT,
-            device: str = DEVICE) -> np.ndarray:
-    """Interface standard niveau 6 : SR couleur pleine image.
 
-    Traite le canal Y avec FSRCNN, Cr/Cb en bicubique.
-    Signature identique aux autres niveaux (img, scale).
+def upscale(
+    img: np.ndarray, scale: int, ckpt_path: str | Path = DEFAULT_CKPT, device: str = DEVICE
+) -> np.ndarray:
+    """Level 6 standard interface: full-image colour SR.
+
+    FSRCNN on the Y channel, bicubic on Cr/Cb.
+    Same signature as the other levels (img, scale).
     """
     model = load_model(ckpt_path, device)
     return _infer(img, model, scale, device)
 
 
-def _infer(img: np.ndarray, model: FSRCNN,
-           scale: int | None = None, device: str = DEVICE) -> np.ndarray:
-    """Inférence interne : FSRCNN sur Y, bicubique sur Cr/Cb."""
+def _infer(
+    img: np.ndarray, model: FSRCNN, scale: int | None = None, device: str = DEVICE
+) -> np.ndarray:
+    """Internal inference: FSRCNN on Y, bicubic on Cr/Cb."""
     model.eval().to(device)
-    sc   = scale or model.scale
+    sc = scale or model.scale
     h, w = img.shape[:2]
 
-    ycrcb     = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+    ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
     y, cr, cb = cv2.split(ycrcb)
 
-    t    = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(device)
+    t = torch.from_numpy(y.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0).to(device)
     with torch.no_grad():
         y_sr = np.clip(model(t).squeeze().cpu().numpy() * 255, 0, 255).astype(np.uint8)
 
