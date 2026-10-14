@@ -9,13 +9,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - name: Install
+      - name: Install (the pinned requirements, CPU-only torch)
         run: |
-          pip install --extra-index-url https://download.pytorch.org/whl/cpu torch
-          pip install numpy opencv-python-headless scikit-image pytest ruff
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          pip install -r requirements.txt pytest ruff
       - run: ruff check .
+      - run: ruff format --check .
       - run: pytest
