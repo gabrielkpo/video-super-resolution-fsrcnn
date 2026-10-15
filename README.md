@@ -1,5 +1,8 @@
 # Video super-resolution with FSRCNN
 
+[![CI](https://github.com/gabrielkpo/video-super-resolution-fsrcnn/actions/workflows/ci.yml/badge.svg)](https://github.com/gabrielkpo/video-super-resolution-fsrcnn/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Research project on **upscaling low-resolution video frames with small, fast models**, in the
 spirit of "Green AI": send fewer pixels over the network and rebuild the rest on the device.
 The project compares classical interpolation, frequency-domain methods, denoising, sparse coding
