@@ -1,17 +1,17 @@
 # Pinned set the project is run and tested with (Python 3.10+).
 # CPU-only torch: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
 bm3d==4.0.3
-codecarbon==3.2.7
-joblib==1.5.3
+codecarbon==3.3.1
+joblib==1.6.0
 matplotlib==3.10.9
 numpy==2.4.4
 opencv-python==4.14.0.94
 pandas==3.0.3
-pillow==12.2.0
+pillow==12.3.0
 pywavelets==1.9.0
 scikit-image==0.26.0
 scikit-learn==1.8.0
-torch==2.11.0
-torchvision==0.26.0
-tqdm==4.67.3
+torch==2.14.1
+torchvision==0.29.1
+tqdm==4.70.1
 -e .
